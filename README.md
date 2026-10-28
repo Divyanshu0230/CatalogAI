@@ -12,9 +12,9 @@ If you are reviewing the assignment, these are the three links.
 
 The API address by itself also opens those docs. I did not put Swagger on a second website.
 
-There is a silent walkthrough of the live site, with no sound. I sign in as Demo 1, look at the shelf, search "cheapest tea", open Masala Tea and run Explain AI, chat with Catalog Assistant AI, draft a rewrite in AI Studio without saving it, and finish on the dashboard.
+The walkthrough below plays on this page. It is silent. I sign in as Demo 1, then the rest is the GenAI work. Smart Search reads "cheapest tea" and returns the two teas with their prices. Explain AI on Masala Tea writes from the saved price and stock. Catalog Assistant AI takes a hello, then "cheapest tea", and puts both tea cards in the thread. AI Studio drafts a new title, description, and tags, and I leave that draft unsaved. The dashboard is the last moment.
 
-[Silent walkthrough](docs/demo/catalogai-walkthrough.webm)
+![Silent walkthrough: Smart Search, Explain AI, a chat with Catalog Assistant AI, and an AI Studio draft](docs/demo/catalogai-walkthrough.gif)
 
 ## Project overview
 
