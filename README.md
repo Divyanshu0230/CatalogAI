@@ -321,24 +321,25 @@ Restart the API after you change a key. `load_dotenv` does not override variable
 
 ## Deployment
 
-The app is packaged for a public host. I have not put it on one yet, so there is no live URL in this README until that deploy exists.
+The live site is [https://catalogai-jpcb.onrender.com](https://catalogai-jpcb.onrender.com).
 
-One machine, the path I would use first:
+The API is [https://catalogai-api-0uij.onrender.com](https://catalogai-api-0uij.onrender.com). Swagger is [https://catalogai-api-0uij.onrender.com/api/docs/](https://catalogai-api-0uij.onrender.com/api/docs/). The schema is [https://catalogai-api-0uij.onrender.com/api/schema/](https://catalogai-api-0uij.onrender.com/api/schema/).
+
+Both run on Render, in Singapore. The site is the React build, served as a static site, so the page itself does not spin down. The API is a Python web service on the free instance, in front of a free Postgres 16 database. I built the frontend with `VITE_API_URL` set to that API origin. `DJANGO_DEBUG` is `0`, `BEHIND_PROXY` is `1`, and the API allows the static site origin.
+
+The shared demo accounts on that database are demo1, demo2, and demo3. The password is Catalog123.
+
+The free API sleeps after 15 minutes with no requests. The next request takes about a minute while Render wakes it. After that it stays up for as long as people are using it. The free database expires on 27 November 2026, thirty days after I created it. That covers this review.
+
+I did not put Redis on the public host. `CELERY_TASK_ALWAYS_EAGER=1` there, so the shelf scan runs inside the request. On my machine I still run Redis and a Celery worker. The public start command migrates, then seeds only when the product table is empty, so a restart does not wipe later edits.
+
+Docker Compose is still the one-machine path:
 
 ```bash
 docker compose up --build
 ```
 
-The site is on port 8080. Nginx serves the frontend and proxies `/api`, `/admin`, and `/static` to Django.
-
-Split hosting, if the frontend and the API live apart:
-
-- Frontend on Vercel or Netlify. Set `VITE_API_URL` to the public API origin at build time.
-- API and the Celery worker on Render, Railway, or Cloud Run. Set `DJANGO_DEBUG=0`, a real `DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ORIGINS`, and `BEHIND_PROXY=1` when TLS ends in front of the process.
-- Managed PostgreSQL for `DATABASE_URL`. The container entrypoint runs `migrate`. Set `SEED_ON_START=1` only for the first demo boot.
-- Managed Redis for `REDIS_URL`, with `CELERY_TASK_ALWAYS_EAGER=0`, and a process running `celery -A config worker --loglevel=info`.
-
-Swagger stays on the API at `/api/docs/`. The schema is `/api/schema/`.
+That site is on port 8080. Nginx serves the frontend and proxies `/api`, `/admin`, and `/static` to Django. `SEED_ON_START=1` in that file is for an empty Compose database.
 
 GitHub Actions, in `.github/workflows/ci.yml`, runs on push and on pull requests. It runs the Django tests, migrates a Postgres 16 service, and builds the frontend.
 
