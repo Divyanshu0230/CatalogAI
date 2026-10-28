@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vitrine
+          POSTGRES_PASSWORD: vitrine
+          POSTGRES_DB: vitrine
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vitrine -d vitrine"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Test
+        working-directory: backend
+        env:
+          USE_SQLITE: "1"
+          DJANGO_SECRET_KEY: ci-secret-key-long-enough-for-hmac-sha256
+          DJANGO_DEBUG: "0"
+        run: python manage.py test
+      - name: Migrate against PostgreSQL
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://vitrine:vitrine@localhost:5432/vitrine
+          DJANGO_SECRET_KEY: ci-secret-key-long-enough-for-hmac-sha256
+          DJANGO_DEBUG: "0"
+        run: python manage.py migrate
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install and build
+        working-directory: frontend
+        run: npm install && npm run build
