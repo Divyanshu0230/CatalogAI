@@ -12,6 +12,10 @@ If you are reviewing the assignment, these are the three links.
 
 The API address by itself also opens those docs. I did not put Swagger on a second website.
 
+There is a silent walkthrough of the live site, with no sound. I sign in as Demo 1, look at the shelf, search "cheapest tea", open Masala Tea and run Explain AI, chat with Catalog Assistant AI, draft a rewrite in AI Studio without saving it, and finish on the dashboard.
+
+[Silent walkthrough](docs/demo/catalogai-walkthrough.webm)
+
 ## Project overview
 
 The catalog is one shared assortment, and the GenAI features all sit on that same assortment. Anyone who is signed in can add or edit a product, and the activity log keeps the name of who did it. That felt closer to a buying desk than a private list per account.
@@ -60,7 +64,7 @@ After sign-in the home page asks you to start with one job: search in a sentence
 
 ![Home](docs/screenshots/home.png)
 
-Smart Search is where a sentence becomes a filter. "cheapest tea" came back as 2 products, ₹165 to ₹285: Masala Tea and Assam Tea Tin.
+Smart Search is where a sentence becomes a filter. "cheapest tea" came back as 2 products, ₹165 to ₹285: Masala Tea and Assam Tea Tin. The same pass is in the silent walkthrough above: the shelf, that search, the product explanation, the chat, AI Studio, and the dashboard.
 
 ![Smart Search for cheapest tea](docs/screenshots/smart-search.png)
 
