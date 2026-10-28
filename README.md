@@ -14,7 +14,9 @@ The API address by itself also opens those docs. I did not put Swagger on a seco
 
 ## Project overview
 
-The catalog is one shared assortment. Anyone who is signed in can add or edit a product, and the activity log keeps the name of who did it. That felt closer to a buying desk than a private list per account.
+The catalog is one shared assortment, and the GenAI features all sit on that same assortment. Anyone who is signed in can add or edit a product, and the activity log keeps the name of who did it. That felt closer to a buying desk than a private list per account.
+
+Smart Search, Catalog Assistant AI, AI Studio, the five jobs on a product page, and the collection brief do not keep a second list of products. They ask Groq to read a sentence or draft some words, then they show what PostgreSQL already has. If you add a tea tomorrow, the next "cheapest tea" can find it. If you delete it, the assistant cannot keep talking about it.
 
 A product has a name, brand, category, description, price, and image URL. I also keep SKU, stock, currency, tags, and a few attributes, because a shelf is hard to run on six fields alone.
 
@@ -66,6 +68,8 @@ API docs are Swagger, on the same API, at `/api/docs/`. I did not host them on a
 
 ## Technology stack
 
+Django holds the catalog. Groq is the only model, and it is called from the API, never from the browser. React is where you type the sentence, the chat, and the draft.
+
 - Python, Django, Django REST Framework, JWT (`djangorestframework-simplejwt`)
 - PostgreSQL, with `pg_trgm` so a fuzzy name can rank
 - React, TypeScript, Vite
@@ -101,7 +105,7 @@ flowchart LR
 
 ## Architecture
 
-Locally I run the React dev server and the Django server against PostgreSQL. Redis sits in Docker, and a Celery worker listens on it. The scan does not run inside the request when a worker is up.
+Locally I run the React dev server and the Django server against PostgreSQL. A GenAI request never stops in the browser. React posts to Django, Django calls Groq, and Django is the one that decides whether the reply is allowed to mention a product. Redis sits in Docker, and a Celery worker listens on it. The scan does not run inside the request when a worker is up. The assistant and Smart Search do not use that queue. They answer in the request, because you are waiting for the sentence.
 
 When the whole stack is in Compose, Nginx serves the built frontend and proxies `/api` to Gunicorn, so the browser only talks to one origin.
 
@@ -143,7 +147,9 @@ Search has two doors.
 - A short query goes to `GET /api/products/?q=`. One or two words must all match. Three or more words can match any of them. On PostgreSQL the match is a word boundary, so "hat" does not hit "that".
 - A sentence goes to `POST /api/ai/search/`. The model is only allowed to return filters: brand, category, price bounds, leftover keywords, and a sort. Django checks those against brands and categories that exist, then PostgreSQL returns the rows. The sentence on the page is written from those rows.
 
-The shelf scan is a Celery task, `scan_catalog`. It looks for near-duplicate names inside a brand, and for prices that sit far from the category median. The result is cached in Redis. The dashboard still computes the numbers itself if the cache is empty, so the page is not blank before the worker has run.
+Chat, AI Studio, a product explanation, and a collection brief are the other GenAI doors. Chat decides first whether you are just talking or whether you want a lookup. Studio and the product jobs only draft text from fields you already saved, and nothing is written until you accept it. The collection brief only sees the products inside that collection.
+
+The shelf scan is a Celery task, `scan_catalog`. It looks for near-duplicate names inside a brand, and for prices that sit far from the category median. That scan is rules, not a model. The result is cached in Redis. The dashboard still computes the numbers itself if the cache is empty, so the page is not blank before the worker has run.
 
 ```mermaid
 flowchart TD
@@ -168,6 +174,8 @@ flowchart TD
 ```
 
 ## Low level
+
+These are the two GenAI calls I would trace if I were checking that the model cannot invent a row. The first is Smart Search. The second is the assistant looking up one product. The dashboard scan under them is separate, and it does not call Groq.
 
 Sentence search, one request:
 
@@ -277,7 +285,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Put your Groq key in `backend/.env`. Then:
+Put your Groq key in `backend/.env`. That key is what turns on Smart Search, the assistant, AI Studio, the product jobs, and the collection brief. Without it, a sentence search still runs through the local reader, and a greeting still gets a reply. Drafting a description stops. Then:
 
 ```bash
 python manage.py migrate
@@ -329,7 +337,7 @@ That Compose database is empty until the API boots with `SEED_ON_START=1`, which
 
 ## Environment variables
 
-Copy `backend/.env.example`.
+Copy `backend/.env.example`. The three Groq lines are the GenAI configuration. `GROQ_API_KEY` is required for the live assistant and for AI Studio. The two model names are only the fallbacks. A search still tries Qwen first.
 
 | Variable | Purpose |
 | --- | --- |
@@ -359,7 +367,7 @@ The repository is [https://github.com/Divyanshu0230/CatalogAI](https://github.co
 
 The API is [https://catalogai-api-0uij.onrender.com](https://catalogai-api-0uij.onrender.com). That address opens the docs. Swagger is also at [https://catalogai-api-0uij.onrender.com/api/docs/](https://catalogai-api-0uij.onrender.com/api/docs/). The schema is [https://catalogai-api-0uij.onrender.com/api/schema/](https://catalogai-api-0uij.onrender.com/api/schema/).
 
-Both run on Render, in Singapore. The site is the React build, served as a static site, so the page itself does not spin down. The API is a Python web service on the free instance, in front of a free Postgres 16 database. I built the frontend with `VITE_API_URL` set to that API origin. `DJANGO_DEBUG` is `0`, `BEHIND_PROXY` is `1`, and the API allows the static site origin.
+Both run on Render, in Singapore. The site is the React build, served as a static site, so the page itself does not spin down. The API is a Python web service on the free instance, in front of a free Postgres 16 database. The same GenAI is on that host. Sign in and you can run Smart Search, open a chat, and draft a listing. The Groq key is set on the API only. I built the frontend with `VITE_API_URL` set to that API origin. `DJANGO_DEBUG` is `0`, `BEHIND_PROXY` is `1`, and the API allows the static site origin.
 
 The shared demo accounts on that database are demo1, demo2, and demo3. The password is Catalog123.
 
@@ -381,7 +389,7 @@ GitHub Actions, in `.github/workflows/ci.yml`, runs on push and on pull requests
 
 I kept one shared assortment. Anyone signed in can edit a product, and the activity log stores who did it. A private catalog per account would have been easier to fake, and it would not feel like a desk where buyers look at the same shelf.
 
-The model interprets language. The database answers. I tried the other way in my head, letting the model list products, and it will invent a SKU the moment the prompt is loose. So Smart Search may only return filters, and the assistant may only talk about rows that were just loaded.
+The model interprets language. The database answers. I tried the other way in my head, letting the model list products, and it will invent a SKU the moment the prompt is loose. So Smart Search may only return filters, the assistant may only talk about rows that were just loaded, AI Studio may only draft from the name, brand, and category you typed, and a product explanation may only use the fields already saved on that row. That same rule is why there are several GenAI features and still one catalog.
 
 Prices are in INR, grouped the Indian way, because the seeded sheet mixes grocery with everything else. A tea at ₹165 and a chair at ₹4,990 should read like prices you would see here.
 
