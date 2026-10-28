@@ -12,9 +12,9 @@ If you are reviewing the assignment, these are the three links.
 
 The API address by itself also opens those docs. I did not put Swagger on a second website.
 
-The walkthrough below plays on this page. It is silent. Use the play and pause controls on the player. I sign in as Demo 1, then the rest is the GenAI work. Smart Search reads "cheapest tea" and returns the two teas with their prices. Explain AI on Masala Tea writes from the saved price and stock. Catalog Assistant AI takes a hello, then "cheapest tea", and puts both tea cards in the thread. AI Studio drafts a new title, description, and tags, and I leave that draft unsaved. The dashboard is the last moment.
+The walkthrough below plays on this page. It is silent. The sign-in screen is the picture before you press play, and the bar under it has play and pause. I sign in as Demo 1, then the rest is the GenAI work. Smart Search reads "cheapest tea" and returns the two teas with their prices. Explain AI on Masala Tea writes from the saved price and stock. Catalog Assistant AI takes a hello, then "cheapest tea", and puts both tea cards in the thread. AI Studio drafts a new title, description, and tags, and I leave that draft unsaved. The dashboard is the last moment.
 
-https://github.com/user-attachments/assets/233aad27-5e53-4f2f-8680-e4142fa9f366
+<video src="https://github.com/user-attachments/assets/233aad27-5e53-4f2f-8680-e4142fa9f366" poster="https://github.com/user-attachments/assets/7c28ac30-7e29-4c77-b963-6679720e8ca6" controls muted playsinline preload="metadata" width="100%"></video>
 
 ## Project overview
 
