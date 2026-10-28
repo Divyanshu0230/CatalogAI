@@ -1,8 +1,8 @@
 # CatalogAI
 
-CatalogAI is a shared product desk. I built it so a buyer can sign in, search a real catalog, and ask about what is listed without the answer drifting off into products that were never added.
+CatalogAI is a shared product desk with GenAI built into the work, not pasted on as one extra button. You can search in a sentence, talk to Catalog Assistant AI, draft a thin listing in AI Studio, and on a single product ask it to explain, name an audience, rewrite, suggest questions, or compare. A collection can get a short buying note from the products already in that set.
 
-Prices, stock, and counts come from PostgreSQL. A language model can read a sentence or draft copy, but it does not get to invent a row.
+The model reads what you typed and drafts words. Prices, stock, and counts still come from PostgreSQL, so an answer cannot drift off into a product that was never added. Groq is the only provider. If it is down, a search can still be read locally. A description draft stops instead of making a paragraph up.
 
 If you are reviewing the assignment, these are the three links.
 
