@@ -4,20 +4,23 @@ CatalogAI is a shared product desk. I built it so a buyer can sign in, search a 
 
 Prices, stock, and counts come from PostgreSQL. A language model can read a sentence or draft copy, but it does not get to invent a row.
 
+If you are reviewing the assignment, these are the three links.
+
+- Live site: https://catalogai-jpcb.onrender.com
+- GitHub: https://github.com/Divyanshu0230/CatalogAI
+- API docs: https://catalogai-api-0uij.onrender.com/api/docs/
+
+The API address by itself also opens those docs. I did not put Swagger on a second website.
+
 ## Project overview
 
 The catalog is one shared assortment. Anyone who is signed in can add or edit a product, and the activity log keeps the name of who did it. That felt closer to a buying desk than a private list per account.
 
 A product has a name, brand, category, description, price, and image URL. I also keep SKU, stock, currency, tags, and a few attributes, because a shelf is hard to run on six fields alone.
 
-What you can do:
+A normal pass through the desk looks like this. You sign in, the shelf is under the three jobs on the home page, and you can filter that shelf by brand, category, tag, and price, then sort it and page through it. If you already know the words, the search box is enough. If you would rather say "cheapest tea" or "Nike jackets under 9000", Smart Search turns that sentence into a filter and PostgreSQL returns the rows. If you want to talk, Catalog Assistant AI keeps the thread. If a listing is thin, AI Studio drafts a description and you decide whether to save it. On the product page the same idea is smaller: explain this one, say who it is for, rewrite it, suggest questions, or compare it with two others. The dashboard is the unglamorous part. It counts thin listings, low stock, odd prices, and names that look like duplicates.
 
-- Register, sign in, and stay signed in with a refresh token
-- Create, update, delete, and open a product
-- Search by words, filter by brand, category, tag, and price, then sort and page through the list
-- Ask in a sentence ("cheapest tea") and get back rows that are actually in the database
-- Talk to Catalog Assistant AI, rewrite a thin description, and compare up to three products
-- Import a CSV, and open a dashboard that counts thin listings, low stock, odd prices, and near-duplicate names
+You can also register your own account, add a product, edit it, delete it, and import a CSV when a sheet arrives as a file. The activity log stores who did the edit.
 
 Demo accounts, all with password `Catalog123`:
 
@@ -67,7 +70,7 @@ API docs are Swagger, on the same API, at `/api/docs/`. I did not host them on a
 - PostgreSQL, with `pg_trgm` so a fuzzy name can rank
 - React, TypeScript, Vite
 - OpenAPI through drf-spectacular
-- Groq for the model calls. Fast model reads a query. Quality model writes copy
+- Groq for the model calls. A search tries the quicker model first. A description starts with the larger one, and a failed call falls through to the next model
 - Redis and Celery for the shelf scan
 - Docker Compose for Postgres, Redis, the API, the worker, and the built frontend
 - Gunicorn and WhiteNoise on the API, Nginx in front of the built React app
@@ -224,14 +227,43 @@ A price is called out when the category has at least four active products and th
 
 ## GenAI
 
-Groq is the only provider. I use `openai/gpt-oss-20b` when the call has to be quick, and `openai/gpt-oss-120b` when it is writing copy.
+This is the part I would want read carefully, because it is more than one button. I use Groq, and only Groq. The key stays on the API. The browser never sees it.
 
-There are two kinds of call, and both are grounded.
+I split the work the way a person at the desk would. Sometimes you are trying to find what is already listed. Sometimes you are trying to write about one listing. The model is allowed to read language and draft words. It is not allowed to be the catalog.
 
-1. **Ask the desk.** The model returns filters only: brand, category, price bounds, leftover keywords, and sort. Those have to match brands and categories that exist. PostgreSQL runs the query. The line you read is built from the rows that came back, so a model cannot invent a count. If the key is missing, the call times out, or the JSON is junk, a local reader does the same job for prices, brands, and category words.
-2. **Draft the story, or write a brief.** Given a name, brand, and category, the quality model drafts a headline, a short note, tags, and only attributes it can support: color, material, audience. Nothing is saved until you accept it. A collection brief only sees the products in that collection. If no model is configured, the brief is built from those rows and labeled that way. A description draft refuses instead of making copy up.
+**Smart Search.** You type a sentence instead of filling brand, category, and price by hand. The one I use to check it is "cheapest tea". A fast call comes back as filters only: the category Grocery, the leftover word tea, and sort by price. If the model names a brand or a category that is not already on the sheet, I drop it. PostgreSQL runs what is left. The sentence on the screen is built from those rows, so the count is the number of products that matched, not a number the model felt like saying. For that query it is 2 products, Brooke Bond Masala Tea at ₹165 and Brooke Bond Assam Tea Tin at ₹285.
 
-On a product page the same idea shows up as Explain, Audience, Rewrite, Questions, and Compare. Explain on a listing talks about that listing's price and category. It is not a general essay.
+The same door understands a budget. "running shoes under ₹9,000" or "headphones under ₹5,000" becomes a price ceiling. "premium watches above ₹50,000" becomes a floor. "Nike jackets" becomes a brand plus a word. If Groq is down, the key is missing, or the JSON is junk, a local reader still catches under, above, between, rupees, and the brand and category names. The search still returns rows. It just says the reading was local.
+
+**Catalog Assistant AI.** This is a chat, and the chats stay in the list on the left. I open a new one and talk to it in three steps, because that is how you can tell it is not a search box with a costume.
+
+1. `hii` is only a greeting. It answers in one line and does not go looking for a product.
+2. `tell me about Brooke Bond Masala Tea` is a lookup. It says there is 1 product, Brooke Bond Masala Tea is ₹165, and the card for that product is in the thread.
+3. `bye` is a goodbye. It does not invent a second tea on the way out.
+
+A product reply is checked before I show it. If it names a price or a product that was not in the rows just fetched, I throw that sentence away and show the line built from the database instead. Up to six products can come back with the reply.
+
+A few questions never need a model. "what is low on stock?" lists active products whose stock is 5 or less and names the first few. If you just looked at a handful of products and ask which is cheaper, the lower price is calculated from those saved prices. The model does not get to crown a product that is not on the screen.
+
+The date and the time, if you ask, come from the clock in Asia/Kolkata. I pass today's date into the call so it does not guess.
+
+**AI Studio.** This is for a listing that is still thin. You give a name, a brand, and a category. The larger model drafts a headline, a description, tags, and only three attributes: color, material, and audience. If it suggests a category, I keep the suggestion only when that category already exists. You read the draft and you save it yourself. Closing the panel does not write anything. If there is no key, this screen stops and says so. I would rather show an empty description than a made-up one.
+
+**On one product.** Open a product and there are five smaller jobs. Each one is handed only the fields already stored on that row, and on the others if you are comparing.
+
+- Explain writes two or three sentences a shopper could read about this listing.
+- Audience says who it fits, from the category, the price, and the description.
+- Rewrite drafts a 40 to 70 word description and four tags. Saving it is still your click.
+- Questions offers four things a shopper might ask before buying.
+- Compare talks about this product and the others using their stored names and prices.
+
+If a draft contains a long number that is not already on the listing, I reject the draft. That catches a model inventing a specification.
+
+**A collection brief.** A collection is a set you already picked, such as the monsoon desk. The model writes a short buying note, and it only sees the products in that set. If Groq is unavailable, the note is assembled from those names and prices and marked as a local note, so you can tell the difference.
+
+**Which model, and what I do when one fails.** A search has to come back quickly, so that call tries Qwen first, then GPT-OSS 20B, then GPT-OSS 120B. Writing is the opposite. A description, a brief, or a product explanation starts with GPT-OSS 120B, then falls through to the others if that call fails. Every call asks for a JSON object, with temperature at 0. If the shape is wrong, I do not paste the raw text onto the page.
+
+That is the rule I kept coming back to. The model can read what you typed, and it can draft words. A product, a price, and a count come from PostgreSQL.
 
 ## Local setup
 
@@ -313,8 +345,8 @@ Copy `backend/.env.example`.
 | `SEED_ON_START` | `1` on the first boot of an empty database. Leave it off after that. |
 | `AI_PROVIDER` | `groq`. |
 | `GROQ_API_KEY` | Key for chat, search reading, and product copy. |
-| `GROQ_FAST_MODEL` | Default `openai/gpt-oss-20b`. Reads a search. |
-| `GROQ_QUALITY_MODEL` | Default `openai/gpt-oss-120b`. Writes descriptions and briefs. |
+| `GROQ_FAST_MODEL` | Default `openai/gpt-oss-20b`. Used when a search needs a second try. |
+| `GROQ_QUALITY_MODEL` | Default `openai/gpt-oss-120b`. Writes descriptions, briefs, and product explanations. |
 | `VITE_API_URL` | Empty in local dev, so Vite proxies `/api`. Set it when the frontend is hosted on another origin. |
 
 Restart the API after you change a key. `load_dotenv` does not override variables that are already in the process.
@@ -323,7 +355,9 @@ Restart the API after you change a key. `load_dotenv` does not override variable
 
 The live site is [https://catalogai-jpcb.onrender.com](https://catalogai-jpcb.onrender.com).
 
-The API is [https://catalogai-api-0uij.onrender.com](https://catalogai-api-0uij.onrender.com). Swagger is [https://catalogai-api-0uij.onrender.com/api/docs/](https://catalogai-api-0uij.onrender.com/api/docs/). The schema is [https://catalogai-api-0uij.onrender.com/api/schema/](https://catalogai-api-0uij.onrender.com/api/schema/).
+The repository is [https://github.com/Divyanshu0230/CatalogAI](https://github.com/Divyanshu0230/CatalogAI).
+
+The API is [https://catalogai-api-0uij.onrender.com](https://catalogai-api-0uij.onrender.com). That address opens the docs. Swagger is also at [https://catalogai-api-0uij.onrender.com/api/docs/](https://catalogai-api-0uij.onrender.com/api/docs/). The schema is [https://catalogai-api-0uij.onrender.com/api/schema/](https://catalogai-api-0uij.onrender.com/api/schema/).
 
 Both run on Render, in Singapore. The site is the React build, served as a static site, so the page itself does not spin down. The API is a Python web service on the free instance, in front of a free Postgres 16 database. I built the frontend with `VITE_API_URL` set to that API origin. `DJANGO_DEBUG` is `0`, `BEHIND_PROXY` is `1`, and the API allows the static site origin.
 
@@ -345,9 +379,14 @@ GitHub Actions, in `.github/workflows/ci.yml`, runs on push and on pull requests
 
 ## Key design decisions
 
-- One shared assortment, not a private catalog per account. `created_by` and the activity log say who edited what. That matches a buying desk better than a toy database per user.
-- The model interprets language. The database answers. If a model is allowed to list products, it will invent SKUs.
-- Prices are INR, grouped the Indian way, because the seeded sheet is a mix of general merchandise and grocery.
-- PostgreSQL trigram similarity ranks a fuzzy name. It does not decide the filter. Duplicate detection uses a name ratio inside the same brand, so the pair is stable and I can explain it.
-- Celery scans are cached. The health page still computes immediately if the cache is cold, so the desk works before a worker is running.
-- A page URL is not an image. The form accepts an `http` or `https` image, and it tells you when the link is an HTML page.
+I kept one shared assortment. Anyone signed in can edit a product, and the activity log stores who did it. A private catalog per account would have been easier to fake, and it would not feel like a desk where buyers look at the same shelf.
+
+The model interprets language. The database answers. I tried the other way in my head, letting the model list products, and it will invent a SKU the moment the prompt is loose. So Smart Search may only return filters, and the assistant may only talk about rows that were just loaded.
+
+Prices are in INR, grouped the Indian way, because the seeded sheet mixes grocery with everything else. A tea at ₹165 and a chair at ₹4,990 should read like prices you would see here.
+
+PostgreSQL trigram similarity can rank a fuzzy name. It does not decide which rows qualify. "hat" must not match "that", so the word search uses a word boundary. Duplicate detection compares names inside the same brand, which keeps the pair explainable on the dashboard.
+
+The shelf scan can run in Celery and sit in Redis. The dashboard still computes the numbers itself when the cache is empty, which is also how the public site works, because I did not put Redis on the free host. A price is flagged when its category has at least four active products and the price is at least five times the median, or at most 15% of it.
+
+An image has to be an image URL. If you paste a page that ends in `.html`, the form tells you. I do not fetch that page from the server. A data URL for a JPEG is accepted, because it is already an image.
